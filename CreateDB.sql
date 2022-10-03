@@ -81,6 +81,19 @@ AS $$
     exchange = exc;
 $$;
 
+DROP PROCEDURE IF EXISTS getTicker;
+
+CREATE PROCEDURE getTicker (exc text)
+LANGUAGE SQL
+AS $$
+  SELECT
+    exchange
+  FROM
+    ticker
+  WHERE
+    exchange = exc;
+$$;
+
 SELECT
   *
 FROM

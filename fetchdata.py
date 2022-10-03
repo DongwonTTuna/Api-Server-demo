@@ -22,6 +22,11 @@ class Fetched_Data:
         def set_header(url: str):
             if url.find("upbit") != -1:
                 return [{"accept": "application/json"}]
+            if url.find("gateio") != -1:
+                return [
+                    {"Accept": "application/json"},
+                    {"Content-Type": "application/json"},
+                ]
             else:
                 return None
 
@@ -37,8 +42,8 @@ class Fetched_Data:
             "BINANCE": "https://api1.binance.com/api/v3/exchangeInfo",
             "FTX": "https://ftx.com/api/markets",
             "BITFLY": "https://api.bitflyer.com/v1/markets",
-            "KUCOIN": "https://coincheck.com/api/ticker",
-            "GATEIO": "https://api.kucoin.com/api/v1/symbols",
+            "KUCOIN": "https://api.kucoin.com/api/v1/symbols",
+            "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs",
             "HUOBI": "https://api.huobi.pro/v2/settings/common/symbols",
         }
         res = self.fetch_data(urls[target])
@@ -49,14 +54,30 @@ class Fetched_Data:
         if target == "UPBIT":
             for market in res:
                 market_list.append(market["market"])
-        else:
+        elif target == "BINANCE":
+            for market in res["symbols"]:
+                market_list.append(market["symbol"])
+        elif target == "FTX":
+            for market in res["result"]:
+                market_list.append(market["name"])
+        elif target == "BITFLY":
+            for market in res:
+                market_list.append(market["product_code"])
+        elif target == "KUCOIN":
+            for market in res["data"]:
+                market_list.append(market["symbol"])
+        elif target == "GATEIO":
+            for market in res:
+                market_list.append(market["id"])
+        elif target == "HUOBI":
+            for market in res["data"]:
+                market_list.append(market["dn"])
+        if market_list == []:
             market_list = None
-        print(market_list)
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 cur.execute("CALL updTicker(%s, %s)", (market_list, target))
                 post.commit()
-                cur.close()
 
     def fetch_start(self):
         need_to_update = []
