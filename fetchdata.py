@@ -10,6 +10,8 @@ async def fetch_request(url: str):
             return {"accept": "application/json"}
         elif url.find("gateio") != -1:
             return {"Accept": "application/json", "Content-Type": "application/json"}
+        elif url.find('mexc') != -1:
+            return {"Content-Type": "application/json"}
         else:
             return None
 
@@ -28,7 +30,7 @@ class GET_TICKERS:
             "BITHUMB": "https://api.bithumb.com/public/ticker/ALL_KRW",
             "BINANCE": "https://api1.binance.com/api/v3/exchangeInfo",
             "FTX": "https://ftx.com/api/markets",
-            "BITFLY": "https://api.bitflyer.com/v1/markets",
+            "MEXC": "https://api.mexc.com/api/v3/exchangeInfo",
             "KUCOIN": "https://api.kucoin.com/api/v1/symbols",
             "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs",
             "HUOBI": "https://api.huobi.pro/v2/settings/common/symbols",
@@ -49,8 +51,8 @@ class GET_TICKERS:
                     lambda x: x.find("USDT") != -1 or x.find("USD") != -1, market_list
                 )
             )
-        elif target == "BITFLY":
-            market_list = [a["product_code"] for a in res]
+        elif target == "MEXC":
+            market_list = [a["symbol"] for a in res["symbols"]]
         elif target == "KUCOIN":
             market_list = [a["symbol"] for a in res["data"]]
             market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
@@ -58,8 +60,8 @@ class GET_TICKERS:
             market_list = [a["id"] for a in res]
             market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
         elif target == "HUOBI":
-            market_list = [a["dn"] for a in res["data"]]
-            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
+            market_list = [a["bc"]+a["qc"] for a in res["data"]]
+            market_list = list(filter(lambda x: x.find("usdt") != -1, market_list))
         else:
             return
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
@@ -137,27 +139,27 @@ class GET_CHART:
             ]
         elif self.exchange == 'HUOBI':
             self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                f"{self.baseurl}{ticker}"
                 for ticker in self.tickers
             ]
         elif self.exchange == 'GATEIO':
             self.urls = [
-                f"{self.baseurl}/spot/candlesticks?currency_pair={ticker}&interval=1h"
+                f"{self.baseurl}{ticker}&interval=1h"
                 for ticker in self.tickers
             ]
         elif self.exchange == 'KUCOIN':
             self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                f"{self.baseurl}{ticker}"
                 for ticker in self.tickers
             ]
-        elif self.exchange == 'BITFLY':
+        elif self.exchange == 'MEXC':
             self.urls = [
                 f"{self.baseurl}{ticker}&interval=1h&limit=1000"
                 for ticker in self.tickers
             ]
         elif self.exchange == 'FTX':
             self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                f"{self.baseurl}{ticker}/candles?resolution=3600"
                 for ticker in self.tickers
             ]
 
@@ -212,22 +214,22 @@ async def initiate_chart():
             "exchange": "BINANCE",
             "url": "https://api.binance.com/api/v3/uiKlines?symbol=",
         },
-        {"exchange": "FTX", "url": "https://ftx.com/api/markets"},
+        {"exchange": "FTX", "url": "https://ftx.com/api/markets/"},
         {
-            "exchange": "BITFLY",
-            "url": "https://api.bitflyer.com/v1/markets",
+            "exchange": "MEXC",
+            "url": "https://api.mexc.com/api/v3/klines?symbol=",
         },
         {
             "exchange": "KUCOIN",
-            "url": "https://api.kucoin.com/api/v1/symbols",
+            "url": "https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=",
         },
         {
             "exchange": "GATEIO",
-            "url": "https://api.gateio.ws/api/v4/spot/currency_pairs",
+            "url": "https://api.gateio.ws/api/v4/spot/currency_pairs=",
         },
         {
             "exchange": "HUOBI",
-            "url": "https://api.huobi.pro/v2/settings/common/symbols",
+            "url": "https://api.huobi.pro/v2/market/history/kline?period=60min&size=2000&symbol=",
         },
     ]
     classes = [GET_CHART(info) for info in infos]

@@ -42,7 +42,7 @@ INSERT INTO tickers (exchange, tickers)
   VALUES ('FTX', NULL);
 
 INSERT INTO tickers (exchange, tickers)
-  VALUES ('BITFLY', NULL);
+  VALUES ('MEXC', NULL);
 
 INSERT INTO tickers (exchange, tickers)
   VALUES ('KUCOIN', NULL);
