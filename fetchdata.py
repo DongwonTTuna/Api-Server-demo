@@ -1,13 +1,16 @@
-import aiohttp, ssl, psycopg, asyncio,nest_asyncio, datetime
+import aiohttp, ssl, psycopg, asyncio, nest_asyncio, datetime
 from aioexec import Procs, Call
+
 nest_asyncio.apply()
 semaphore = asyncio.Semaphore(200)
 ssl._create_default_https_context = ssl._create_unverified_context
+
+
 async def fetch_request(url: str):
     def set_header(url: str):
         if url.find("gateio") != -1:
             return {"Accept": "application/json", "Content-Type": "application/json"}
-        elif url.find("mexc") != -1 or url.find('bybit') != -1:
+        elif url.find("mexc") != -1 or url.find("bybit") != -1:
             return {"Content-Type": "application/json"}
         else:
             return None
@@ -81,15 +84,15 @@ class GET_TICKERS:
 class GET_CHART:
     def __init__(self, exchange):
         url = {
-                "BYBIT": "https://api.bybit.com/v2/public/kline/list?symbol=",
-                "BINANCE": "https://api.binance.com/api/v3/uiKlines?symbol=",
-                "FTX": "https://ftx.com/api/markets/",
-                "MEXC": "https://api.mexc.com/api/v3/klines?symbol=",
-                "KUCOIN": "https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=",
-                "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs=",
-                "HUOBI": "https://api.huobi.pro/v2/market/history/kline?period=60min&size=2000&symbol=",
-            }
-        
+            "BYBIT": "https://api.bybit.com/v2/public/kline/list?symbol=",
+            "BINANCE": "https://api.binance.com/api/v3/uiKlines?symbol=",
+            "FTX": "https://ftx.com/api/markets/",
+            "MEXC": "https://api.mexc.com/api/v3/klines?symbol=",
+            "KUCOIN": "https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=",
+            "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs=",
+            "HUOBI": "https://api.huobi.pro/v2/market/history/kline?period=60min&size=2000&symbol=",
+        }
+
         self.exchange = exchange
         self.baseurl = url[exchange]
         self.urls = []
@@ -97,16 +100,22 @@ class GET_CHART:
         self.db = []
         self.targetdb = []
 
-    def insert(self, ticker, db):
+    def insert(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
-                cur.execute(
-                    "DELETE FROM CHARTDATA WHERE (exchange,ticker) = (%s,%s)",
-                    (self.exchange, ticker),
-                )
-                post.commit()
-                for args in db:
-                    """
+                Flag = True
+                CurrentTicker = ''
+                for args in self.targetdb:
+                    if CurrentTicker != args[1]:
+                        Flag = True
+                    if Flag == True and CurrentTicker != args[1]:
+                        cur.execute(
+                            "DELETE FROM CHARTDATA WHERE (exchange,ticker) = (%s,%s)",
+                            (self.exchange, args[1]),
+                        )
+                        post.commit()
+                        Flag = False
+                        CurrentTicker = args[1]
                     print(
                         args[0],
                         args[1],
@@ -117,7 +126,7 @@ class GET_CHART:
                         args[6],
                         args[7],
                         args[8],
-                    )"""
+                    )
                     cur.execute(
                         "INSERT INTO CHARTDATA (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                         (
@@ -141,10 +150,13 @@ class GET_CHART:
 
     def sumurls(self):
         if self.exchange == "BYBIT":
-            self.urls = [f"{self.baseurl}{ticker}&interval=60&from={round(datetime.datetime.now().timestamp()) - 3600*200}" for ticker in self.tickers]
+            self.urls = [
+                f"{self.baseurl}{ticker}&interval=60&from={round(datetime.datetime.now().timestamp()) - 3600*200}"
+                for ticker in self.tickers
+            ]
         elif self.exchange == "BINANCE":
             self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                f"{self.baseurl}{ticker}&interval=1h&limit=200"
                 for ticker in self.tickers
             ]
         elif self.exchange == "HUOBI":
@@ -157,7 +169,7 @@ class GET_CHART:
             self.urls = [f"{self.baseurl}{ticker}" for ticker in self.tickers]
         elif self.exchange == "MEXC":
             self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                f"{self.baseurl}{ticker}&interval=1h&limit=200"
                 for ticker in self.tickers
             ]
         elif self.exchange == "FTX":
@@ -191,38 +203,39 @@ class GET_CHART:
     def processing_Data(self):
         if self.exchange == "BYBIT":
             for db in self.db:
-                for n,a in enumerate(db["result"]):
-                    #(exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
-                    self.targetdb.append([
-                        self.exchange,
-                        a["symbol"],
-                        a["open_time"],
-                        a["open"],
-                        a["close"],
-                        a["low"],
-                        a["high"],
-                        a["volume"],
-                        n
-                    ])
-                    """
+                try:
+                    for n, a in enumerate(db["result"]):
+                        # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
+                        self.targetdb.append(
+                            [
+                                self.exchange,
+                                a["symbol"],
+                                a["open_time"],
+                                a["open"],
+                                a["close"],
+                                a["low"],
+                                a["high"],
+                                a["volume"],
+                                n,
+                            ]
+                        )
+                except:
+                    continue
+            self.insert()
         elif self.exchange == "BINANCE":
             res = []
             for num, db in enumerate(self.db):
-                db["ticker"] = self.tickers[num]
+                db.append(self.tickers[num])
                 res.append(db)
             self.db = res
-            tempdb = []
             for db in self.db:
-                ticker = db["ticker"]
-                
-                for num, a in enumerate(db["data"]):
-                    if num >= 1000:
-                        break
-                    tempdb.append(
-                        [self.exchange, ticker, a[0], a[1], a[2], a[3], a[4], a[5], num]
+                ticker = db[-1]
+                for num, a in enumerate(db[:-1]):
+                    self.targetdb.append(
+                        [self.exchange, ticker, a[0], a[4], a[3], a[2], a[4], a[5], num]
                     )
-                self.insert(ticker, tempdb)
-            """
+            self.insert()
+            
         elif self.exchange == "FTX":
             print("FTX")
             print(self.db[0])
@@ -244,7 +257,7 @@ class GET_CHART:
         self.get_tickers()
         self.sumurls()
         await self.fetchDataFromTheUrl()
-        #self.processing_Data()
+        self.processing_Data()
         print(self.exchange)
 
 
@@ -262,20 +275,23 @@ def initiate_ticker():
 
 
 async def initiate_chart():
-    exchange = [
-        "BYBIT",
-        "BINANCE",
+    tempexc = [
         "FTX",
         "MEXC",
         "KUCOIN",
         "GATEIO",
         "HUOBI",
+        "BYBIT",
+    ]
+    exchange = [
+        "BINANCE",
+        "BYBIT",
     ]
     await asyncio.gather(
-        *Procs(10).batch(Call(startchart,exchange=exc) for exc in exchange)
+        *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
     )
 
 
 if __name__ == "__main__":
-    initiate_ticker()
+    #initiate_ticker()
     asyncio.run(initiate_chart())
