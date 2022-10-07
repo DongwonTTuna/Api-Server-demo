@@ -1,40 +1,31 @@
-import urllib.request, ssl, psycopg, json, time
+import aiohttp, ssl, psycopg, asyncio
+from aioexec import Procs, Call
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-def fetch_request(url: str):
-    def create_request(url, header):
-        req = urllib.request.Request(url)
-        if header == None:
-            return req
-        for head in header:
-            for head_h in head:
-                req.add_header(head_h, head[head_h])
-        return req
-
+async def fetch_request(url: str):
     def set_header(url: str):
-        if url.find("upbit") != -1:
-            return [{"accept": "application/json"}]
+        if url.find("bithumb") != -1:
+            return {"accept": "application/json"}
         elif url.find("gateio") != -1:
-            return [
-                {"Accept": "application/json"},
-                {"Content-Type": "application/json"},
-            ]
+            return {"Accept": "application/json", "Content-Type": "application/json"}
         else:
             return None
 
     header = set_header(url)
-    req = create_request(url, header)
-    with urllib.request.urlopen(req) as res:
-        data = json.loads(res.read().decode("utf-8"))
-        return data
+    async with aiohttp.ClientSession(headers=header) as session:
+        async with session.get(url) as res:
+            try:
+                return await res.json()
+            except:
+                return await res.read()
 
 
 class GET_TICKERS:
-    def get_tickers(self, target: str):
+    async def get_tickers(self, target: str):
         urls = {
-            "UPBIT": "https://api.upbit.com/v1/market/all",
+            "BITHUMB": "https://api.bithumb.com/public/ticker/ALL_KRW",
             "BINANCE": "https://api1.binance.com/api/v3/exchangeInfo",
             "FTX": "https://ftx.com/api/markets",
             "BITFLY": "https://api.bitflyer.com/v1/markets",
@@ -42,99 +33,213 @@ class GET_TICKERS:
             "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs",
             "HUOBI": "https://api.huobi.pro/v2/settings/common/symbols",
         }
-        res = fetch_request(urls[target])
+        res = await fetch_request(urls[target])
         self.update_tickers(target, res)
 
     def update_tickers(self, target: str, res):
-        market_list = []
-        if target == "UPBIT":
-            for market in res:
-                market_list.append(market["market"])
+        if target == "BITHUMB":
+            market_list = [a for a in res["data"]][:-1]
         elif target == "BINANCE":
-            for market in res["symbols"]:
-                market_list.append(market["symbol"])
+            market_list = [a["symbol"] for a in res["symbols"]]
+            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
         elif target == "FTX":
-            for market in res["result"]:
-                market_list.append(market["name"])
+            market_list = [a["name"] for a in res["result"]]
+            market_list = list(
+                filter(
+                    lambda x: x.find("USDT") != -1 or x.find("USD") != -1, market_list
+                )
+            )
         elif target == "BITFLY":
-            for market in res:
-                market_list.append(market["product_code"])
+            market_list = [a["product_code"] for a in res]
         elif target == "KUCOIN":
-            for market in res["data"]:
-                market_list.append(market["symbol"])
+            market_list = [a["symbol"] for a in res["data"]]
+            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
         elif target == "GATEIO":
-            for market in res:
-                market_list.append(market["id"])
+            market_list = [a["id"] for a in res]
+            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
         elif target == "HUOBI":
-            for market in res["data"]:
-                market_list.append(market["dn"])
-        if market_list == []:
-            market_list = None
+            market_list = [a["dn"] for a in res["data"]]
+            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
+        else:
+            return
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 cur.execute("CALL updTicker(%s, %s)", (market_list, target))
                 post.commit()
 
-    def ticker_start(self):
+    async def ticker_start(self):
         need_to_update = []
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 cur.execute("SELECT * FROM TICKERS")
                 for record in cur.fetchall():
-                    _, b, c = record
-                    if c == None:
-                        need_to_update.append(b)
-        for update in need_to_update:
-            self.get_tickers(update)
+                    a, _ = record
+                    need_to_update.append(a)
+        await asyncio.gather(*[self.get_tickers(update) for update in need_to_update])
+
+
+def insert():
+    db = []
+    with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
+        with post.cursor() as cur:
+            cur.execute(
+                "DELETE FROM CHARTDATA",
+            )
+            post.commit()
+            for args in db:
+                print(
+                    args[0],
+                    args[1],
+                    args[2],
+                    args[3],
+                    args[4],
+                    args[5],
+                    args[6],
+                    args[7],
+                    args[8],
+                )
+                cur.execute(
+                    "INSERT INTO CHARTDATA (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        args[0],
+                        args[1],
+                        args[2],
+                        args[3],
+                        args[4],
+                        args[5],
+                        args[6],
+                        args[7],
+                        args[8],
+                    ),
+                )
 
 
 class GET_CHART:
-    def __init__(self):
+    def __init__(self, exchange):
+        self.exchange = exchange["exchange"]
+        self.baseurl = exchange["url"]
+        self.urls = []
         self.tickers = []
 
-    def initialize_variables(self):
-        self.tickers = []
-
-    def getChart(self, target: str, tickers: list):
-        urls = {
-            "UPBIT": "https://api.upbit.com/v1/candles/minutes/15?market=",
-            "BINANCE": "https://api1.binance.com/api/v3/exchangeInfo",
-            "FTX": "https://ftx.com/api/markets",
-            "BITFLY": "https://api.bitflyer.com/v1/markets",
-            "KUCOIN": "https://api.kucoin.com/api/v1/symbols",
-            "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs",
-            "HUOBI": "https://api.huobi.pro/v2/settings/common/symbols",
-        }
-        if target == "UPBIT":
-            with psycopg.connect(
-                "dbname=API_SERVER user=postgres password=0790"
-            ) as post:
-                with post.cursor() as cur:
-                    for market in tickers:
-                        data.append(
-                            json.dumps(
-                                fetch_request(urls[target] + market + "&count=200")
-                            )
-                        )
-                    cur.execute("CALL updChart(%s,%s)", (data, target))
-
-    def start_get(self):
+    def get_tickers(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
-                cur.execute("SELECT exchange FROM TICKERS")
-                for exc in cur.fetchall():
-                    cur.execute("SELECT * FROM getTicker(%s)", (exc[0],))
-                    self.getChart(exc[0], cur.fetchall()[0][0])
+                cur.execute("SELECT * FROM getTicker(%s)", (self.exchange,))
+                self.tickers = cur.fetchall()[0][0]
+
+    def sumurls(self):
+        if self.exchange == "BITHUMB":
+            self.urls = [f"{self.baseurl}{ticker}_KRW/1h" for ticker in self.tickers]
+        elif self.exchange == "BINANCE":
+            self.urls = [
+                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                for ticker in self.tickers
+            ]
+        elif self.exchange == 'HUOBI':
+            self.urls = [
+                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                for ticker in self.tickers
+            ]
+        elif self.exchange == 'GATEIO':
+            self.urls = [
+                f"{self.baseurl}/spot/candlesticks?currency_pair={ticker}&interval=1h"
+                for ticker in self.tickers
+            ]
+        elif self.exchange == 'KUCOIN':
+            self.urls = [
+                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                for ticker in self.tickers
+            ]
+        elif self.exchange == 'BITFLY':
+            self.urls = [
+                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                for ticker in self.tickers
+            ]
+        elif self.exchange == 'FTX':
+            self.urls = [
+                f"{self.baseurl}{ticker}&interval=1h&limit=1000"
+                for ticker in self.tickers
+            ]
+
+    async def fetchDataFromTheUrl(self):
+        res = []
+        """
+        if self.exchange == "BITHUMB":
+            for i in range(30, len(self.urls), 30):
+                res.append(
+                    await asyncio.gather(
+                        *[fetch_request(url) for url in self.urls[i - 30 : i]]
+                    )
+                )
+                await asyncio.sleep(1)
+                if i + 30 > len(self.urls):
+                    temp = len(self.urls)
+                    res.append(
+                        await asyncio.gather(
+                            *[fetch_request(url) for url in self.urls[i:temp]]
+                        )
+                    )
+        else:
+
+        """
+        res = await asyncio.gather(*[fetch_request(url) for url in self.urls])
+        return res
+
+    async def main(self):
+        self.get_tickers()
+        self.sumurls()
+        res = await self.fetchDataFromTheUrl()
+        with open("./result.txt", "a") as f:
+            f.write(str(res))
 
 
-class Fetch_Data:
-    def start(self):
-        get_tickers = GET_TICKERS()
-        get_chart = GET_CHART()
-        get_tickers.ticker_start()
-        get_chart.start_get()
+loop = asyncio.get_event_loop()
+
+
+def initiate_ticker():
+    get_tickers = GET_TICKERS()
+    future = asyncio.ensure_future(get_tickers.ticker_start())
+    loop.run_until_complete(future)
+
+
+async def initiate_chart():
+    infos = [
+        {
+            "exchange": "BITHUMB",
+            "url": "https://api.bithumb.com/public/candlestick/",
+        },
+        {
+            "exchange": "BINANCE",
+            "url": "https://api.binance.com/api/v3/uiKlines?symbol=",
+        },
+        {"exchange": "FTX", "url": "https://ftx.com/api/markets"},
+        {
+            "exchange": "BITFLY",
+            "url": "https://api.bitflyer.com/v1/markets",
+        },
+        {
+            "exchange": "KUCOIN",
+            "url": "https://api.kucoin.com/api/v1/symbols",
+        },
+        {
+            "exchange": "GATEIO",
+            "url": "https://api.gateio.ws/api/v4/spot/currency_pairs",
+        },
+        {
+            "exchange": "HUOBI",
+            "url": "https://api.huobi.pro/v2/settings/common/symbols",
+        },
+    ]
+    classes = [GET_CHART(info) for info in infos]
+    await asyncio.gather(
+        *Procs(10).batch(*[Call(await clas.main()) for clas in classes])
+    )
+
+
+def start():
+    initiate_ticker()
+    asyncio.run(initiate_chart())
 
 
 if __name__ == "__main__":
-    Fetch = Fetch_Data()
-    Fetch.start()
+    start()
