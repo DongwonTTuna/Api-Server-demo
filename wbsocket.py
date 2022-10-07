@@ -14,9 +14,6 @@ async def fetch_data(param):
                         
             
 
-API_KEY = 'QYThuW7KLTFMVX9mck2D8v9WNxHWEXX62v6GkDITkxEYOclrfjn8Yjd7No9XEc0i'
-SECRET_KEY = 'BvdTuW0SFUfjvXgftvNnk06d3IlYrH1laMlIhvjNsXcEUSVuqVio7vxfCLtgQin2'
-
 'btcusdt@kline_1h'
 
 async def main():
