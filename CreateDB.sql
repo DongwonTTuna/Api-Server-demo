@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS TSTAMP (
 
 /* INSERT VALUES*/
 INSERT INTO tickers (exchange, tickers)
-  VALUES ('BITHUMB', NULL);
+  VALUES ('BYBIT', NULL);
 
 INSERT INTO tickers (exchange, tickers)
   VALUES ('BINANCE', NULL);
