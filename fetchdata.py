@@ -10,7 +10,9 @@ async def fetch_request(url: str):
     def set_header(url: str):
         if url.find("gateio") != -1:
             return {"Accept": "application/json", "Content-Type": "application/json"}
-        elif url.find("mexc") != -1 or url.find("bybit") != -1:
+        elif (
+            url.find("mexc") != -1 or url.find("bybit") != -1 or url.find("upbit") != -1
+        ):
             return {"Content-Type": "application/json"}
         else:
             return None
@@ -28,6 +30,7 @@ async def fetch_request(url: str):
 class GET_TICKERS:
     async def get_tickers(self, target: str):
         urls = {
+            "UPBIT": "https://api.upbit.com/v1/market/all",
             "BYBIT": "https://api.bybit.com/v2/public/symbols",
             "BINANCE": "https://api1.binance.com/api/v3/exchangeInfo",
             "FTX": "https://ftx.com/api/markets",
@@ -42,6 +45,9 @@ class GET_TICKERS:
     def update_tickers(self, target: str, res):
         if target == "BYBIT":
             market_list = [a["name"] for a in res["result"]]
+        elif target == "UPBIT":
+            market_list = [a["market"] for a in res]
+            market_list = list(filter(lambda x: x.find("KRW") != -1, market_list))
         elif target == "BINANCE":
             market_list = [a["symbol"] for a in res["symbols"]]
             market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
@@ -54,6 +60,22 @@ class GET_TICKERS:
             )
         elif target == "MEXC":
             market_list = [a["symbol"] for a in res["symbols"]]
+            market_list = list(
+                filter(
+                    lambda x: x.find("USDT") != -1
+                    and (
+                        x.find("2S") == -1
+                        and x.find("2L") == -1
+                        and x.find("3L") == -1
+                        and x.find("3S") == -1
+                        and x.find("4S") == -1
+                        and x.find("4L") == -1
+                        and x.find("5S") == -1
+                        and x.find("5L") == -1
+                    ),
+                    market_list,
+                )
+            )
         elif target == "KUCOIN":
             market_list = [a["symbol"] for a in res["data"]]
             market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
@@ -65,6 +87,7 @@ class GET_TICKERS:
             market_list = list(filter(lambda x: x.find("usdt") != -1, market_list))
         else:
             return
+
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 cur.execute("CALL updTicker(%s, %s)", (market_list, target))
@@ -84,6 +107,7 @@ class GET_TICKERS:
 class GET_CHART:
     def __init__(self, exchange):
         url = {
+            "UPBIT": "https://api.upbit.com/v1/candles/minutes/60?market=",
             "BYBIT": "https://api.bybit.com/v2/public/kline/list?symbol=",
             "BINANCE": "https://api.binance.com/api/v3/uiKlines?symbol=",
             "FTX": "https://ftx.com/api/markets/",
@@ -95,16 +119,15 @@ class GET_CHART:
 
         self.exchange = exchange
         self.baseurl = url[exchange]
-        self.urls = []
+        self.basedata = []
         self.tickers = []
-        self.db = []
         self.targetdb = []
 
     def insert(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 Flag = True
-                CurrentTicker = ''
+                CurrentTicker = ""
                 for args in self.targetdb:
                     if CurrentTicker != args[1]:
                         Flag = True
@@ -150,101 +173,234 @@ class GET_CHART:
 
     def sumurls(self):
         if self.exchange == "BYBIT":
-            self.urls = [
-                f"{self.baseurl}{ticker}&interval=60&from={round(datetime.datetime.now().timestamp()) - 3600*200}"
+            self.basedata = [
+                {
+                    "url": f"{self.baseurl}{ticker}&interval=60&from={round(datetime.datetime.now().timestamp()) - 3600*200}",
+                    "ticker": ticker,
+                }
+                for ticker in self.tickers
+            ]
+        elif self.exchange == "UPBIT":
+            self.basedata = [
+                {
+                    "url": f"{self.baseurl}{ticker}&count=200",
+                }
                 for ticker in self.tickers
             ]
         elif self.exchange == "BINANCE":
-            self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=200"
+            self.basedata = [
+                {
+                    "url": f"{self.baseurl}{ticker}&interval=1h&limit=200",
+                    "ticker": ticker,
+                }
                 for ticker in self.tickers
             ]
         elif self.exchange == "HUOBI":
-            self.urls = [f"{self.baseurl}{ticker}" for ticker in self.tickers]
+            self.basedata = [
+                {"url": f"{self.baseurl}{ticker}", "ticker": ticker}
+                for ticker in self.tickers
+            ]
         elif self.exchange == "GATEIO":
-            self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h" for ticker in self.tickers
+            self.basedata = [
+                {"url": f"{self.baseurl}{ticker}&interval=1h", "ticker": ticker}
+                for ticker in self.tickers
             ]
         elif self.exchange == "KUCOIN":
-            self.urls = [f"{self.baseurl}{ticker}" for ticker in self.tickers]
+            self.basedata = [
+                {"url": f"{self.baseurl}{ticker}" , "ticker": ticker} for ticker in self.tickers
+            ]
         elif self.exchange == "MEXC":
-            self.urls = [
-                f"{self.baseurl}{ticker}&interval=1h&limit=200"
+            self.basedata = [
+                {
+                    "url": f"{self.baseurl}{ticker}&interval=60m&limit=200",
+                    "ticker": ticker,
+                }
                 for ticker in self.tickers
             ]
         elif self.exchange == "FTX":
-            self.urls = [
-                f"{self.baseurl}{ticker}/candles?resolution=3600"
+            self.basedata = [
+                {
+                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={round(datetime.datetime.now().timestamp()) - 3600*200}",
+                    "ticker": ticker,
+                }
                 for ticker in self.tickers
             ]
 
-    async def fetchDataFromTheUrl(self):
-        """
-        if self.exchange == "BITHUMB":
-            for i in range(30, len(self.urls), 30):
-                res.append(
-                    await asyncio.gather(
-                        *[fetch_request(url) for url in self.urls[i - 30 : i]]
-                    )
-                )
-                await asyncio.sleep(1)
-                if i + 30 > len(self.urls):
-                    temp = len(self.urls)
-                    res.append(
-                        await asyncio.gather(
-                            *[fetch_request(url) for url in self.urls[i:temp]]
-                        )
-                    )
-        else:
+    async def RefetchData(self, lst):
+        for num in lst:
+            self.basedata[num]["data"] = ""
+        print(len(lst))
+        res = await asyncio.gather(
+            *[fetch_request(self.basedata[num]["url"]) for num in lst]
+        )
+        for n, num in enumerate(lst):
+            self.basedata[num]["data"] = res[n]
 
-        """
-        self.db = await asyncio.gather(*[fetch_request(url) for url in self.urls])
+    async def fetchDataFromTheUrl(self):
+        res = await asyncio.gather(
+            *[fetch_request(url["url"]) for url in self.basedata]
+        )
+        for n, dta in enumerate(res):
+            self.basedata[n]["data"] = dta
+
+        if self.exchange == "MEXC":
+            while True:
+                lst = []
+                for num, data in enumerate(self.basedata):
+                    if type(data["data"]) == dict:
+                        lst.append(num)
+                if lst == []:
+                    break
+                await asyncio.sleep(2)
+                await self.RefetchData(lst)
+        elif self.exchange == "KUCOIN":
+            while True:
+                lst = []
+                for num, data in enumerate(self.basedata):
+                    try:
+                        if type(data["data"]) != bytes and data["data"]["data"] == []:
+                            del self.basedata[num]
+                            continue
+                    except:
+                        pass
+                    if type(data["data"]) == bytes or data["data"]["code"] == "429000":
+                        lst.append(num)
+                if lst == []:
+                    break
+                await asyncio.sleep(2)
+                await self.RefetchData(lst)
+        elif self.exchange == "UPBIT":
+            while True:
+                lst = []
+                for num, data in enumerate(self.basedata):
+                    if type(data["data"]) == bytes:
+                        lst.append(num)
+                if lst == []:
+                    break
+                await asyncio.sleep(1)
+                await self.RefetchData(lst)
+        elif self.exchange == "BYBIT":
+            while True:
+                lst = []
+                for num, data in enumerate(self.basedata):
+                    if data["data"]["ret_code"] != 0:
+                        lst.append(num)
+                    if lst == []:
+                        break
+                    await asyncio.sleep(1)
+                    await self.RefetchData(lst)
+
+        print("succes")
 
     def processing_Data(self):
         if self.exchange == "BYBIT":
-            for db in self.db:
-                try:
-                    for n, a in enumerate(db["result"]):
-                        # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
-                        self.targetdb.append(
-                            [
-                                self.exchange,
-                                a["symbol"],
-                                a["open_time"],
-                                a["open"],
-                                a["close"],
-                                a["low"],
-                                a["high"],
-                                a["volume"],
-                                n,
-                            ]
-                        )
-                except:
-                    continue
-            self.insert()
-        elif self.exchange == "BINANCE":
-            res = []
-            for num, db in enumerate(self.db):
-                db.append(self.tickers[num])
-                res.append(db)
-            self.db = res
-            for db in self.db:
-                ticker = db[-1]
-                for num, a in enumerate(db[:-1]):
+            for db in self.basedata:
+                print(db)
+                for n, a in enumerate(db["data"]["result"]):
+                    # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
                     self.targetdb.append(
-                        [self.exchange, ticker, a[0], a[4], a[3], a[2], a[4], a[5], num]
+                        [
+                            self.exchange,
+                            a["symbol"],
+                            a["open_time"],
+                            a["open"],
+                            a["close"],
+                            a["low"],
+                            a["high"],
+                            a["volume"],
+                            n,
+                        ]
                     )
             self.insert()
-            
+        elif self.exchange == "BINANCE":
+            for db in self.basedata:
+                for num, a in enumerate(db["data"]):
+                    self.targetdb.append(
+                        [
+                            self.exchange,
+                            db["ticker"],
+                            a[0],
+                            a[4],
+                            a[3],
+                            a[2],
+                            a[4],
+                            a[5],
+                            num,
+                        ]
+                    )
+            self.insert()
+        elif self.exchange == "UPBIT":
+            for db in self.basedata:
+                for num, a in enumerate(db["data"]):
+                    self.targetdb.append(
+                        [
+                            self.exchange,
+                            a["market"],
+                            a["timestamp"],
+                            a["opening_price"],
+                            a["trade_price"],
+                            a["low_price"],
+                            a["high_price"],
+                            a["candle_acc_trade_volume"],
+                            num,
+                        ]
+                    )
+            self.insert()
         elif self.exchange == "FTX":
-            print("FTX")
-            print(self.db[0])
+            for db in self.basedata:
+                for num, each in enumerate(db["data"]["result"]):
+                    self.targetdb.append(
+                        [
+                            self.exchange,
+                            db["ticker"],
+                            round(
+                                datetime.datetime.fromisoformat(
+                                    each["startTime"]
+                                ).timestamp()
+                            ),
+                            each["open"],
+                            each["close"],
+                            each["low"],
+                            each["high"],
+                            each["volume"],
+                            num,
+                        ]
+                    )
+            self.insert()
         elif self.exchange == "MEXC":
-            print("MEXC")
-            print(self.db[0])
+            for db in self.basedata:
+                for num, a in enumerate(db["data"]):
+                    # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
+                    self.targetdb.append(
+                        [
+                            self.exchange,
+                            db["ticker"],
+                            a[0],
+                            a[1],
+                            a[4],
+                            a[3],
+                            a[2],
+                            a[5],
+                            num,
+                        ]
+                    )
+            self.insert()
         elif self.exchange == "KUCOIN":
-            print("KUCOIN")
-            print(self.db[0])
+            for db in self.basedata:
+                for a in db["data"]:
+                    self.targetdb.append(
+                        [
+                            self.exchange,
+                            db["ticker"],
+                            a[0],
+                            a[1],
+                            a[2],
+                            a[4],
+                            a[3],
+                            a[5],
+                            num,
+                        ]
+                    )
         elif self.exchange == "GATEIO":
             print("GATEIO")
             print(self.db[0])
@@ -257,6 +413,9 @@ class GET_CHART:
         self.get_tickers()
         self.sumurls()
         await self.fetchDataFromTheUrl()
+        with open("./result.txt", "w") as f:
+            for data in self.basedata:
+                f.write(str(data) + "\n")
         self.processing_Data()
         print(self.exchange)
 
@@ -275,23 +434,23 @@ def initiate_ticker():
 
 
 async def initiate_chart():
-    tempexc = [
-        "FTX",
+    doneexc = [
+        "UPBIT",
         "MEXC",
-        "KUCOIN",
+        "FTX",
+        "BINANCE",
+    ]
+    tempexc = [
+        "BYBIT",
         "GATEIO",
         "HUOBI",
-        "BYBIT",
     ]
-    exchange = [
-        "BINANCE",
-        "BYBIT",
-    ]
+    exchange = ["KUCOIN",]
     await asyncio.gather(
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
     )
 
 
 if __name__ == "__main__":
-    #initiate_ticker()
+    initiate_ticker()
     asyncio.run(initiate_chart())

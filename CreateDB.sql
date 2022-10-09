@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS TSTAMP (
 
 /* INSERT VALUES*/
 INSERT INTO tickers (exchange, tickers)
+  VALUES ('UPBIT', NULL);
+INSERT INTO tickers (exchange, tickers)
   VALUES ('BYBIT', NULL);
 
 INSERT INTO tickers (exchange, tickers)
