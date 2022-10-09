@@ -1,4 +1,4 @@
-import aiohttp, ssl, psycopg, asyncio, nest_asyncio, datetime
+import aiohttp, ssl, psycopg, asyncio, nest_asyncio, datetime, json
 from aioexec import Procs, Call
 
 nest_asyncio.apply()
@@ -18,13 +18,17 @@ async def fetch_request(url: str):
             return None
 
     header = set_header(url)
-    async with semaphore:
-        async with aiohttp.ClientSession(headers=header) as session:
-            async with session.get(url) as res:
-                try:
-                    return await res.json()
-                except:
-                    return await res.read()
+    while True:
+        try:
+            async with semaphore:
+                async with aiohttp.ClientSession(headers=header) as session:
+                    async with session.get(url) as res:
+                        try:
+                            return await res.json()
+                        except:
+                            return await res.read()
+        except:
+            continue
 
 
 class GET_TICKERS:
@@ -113,8 +117,8 @@ class GET_CHART:
             "FTX": "https://ftx.com/api/markets/",
             "MEXC": "https://api.mexc.com/api/v3/klines?symbol=",
             "KUCOIN": "https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=",
-            "GATEIO": "https://api.gateio.ws/api/v4/spot/currency_pairs=",
-            "HUOBI": "https://api.huobi.pro/v2/market/history/kline?period=60min&size=2000&symbol=",
+            "GATEIO": "https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=",
+            "HUOBI": "https://api.huobi.pro/market/history/kline?period=60min&size=200&symbol=",
         }
 
         self.exchange = exchange
@@ -202,12 +206,16 @@ class GET_CHART:
             ]
         elif self.exchange == "GATEIO":
             self.basedata = [
-                {"url": f"{self.baseurl}{ticker}&interval=1h", "ticker": ticker}
+                {
+                    "url": f"{self.baseurl}{ticker}&limit=200&interval=1h",
+                    "ticker": ticker,
+                }
                 for ticker in self.tickers
             ]
         elif self.exchange == "KUCOIN":
             self.basedata = [
-                {"url": f"{self.baseurl}{ticker}" , "ticker": ticker} for ticker in self.tickers
+                {"url": f"{self.baseurl}{ticker}", "ticker": ticker}
+                for ticker in self.tickers
             ]
         elif self.exchange == "MEXC":
             self.basedata = [
@@ -387,7 +395,7 @@ class GET_CHART:
             self.insert()
         elif self.exchange == "KUCOIN":
             for db in self.basedata:
-                for a in db["data"]:
+                for num, a in enumerate(db["data"]["data"]):
                     self.targetdb.append(
                         [
                             self.exchange,
@@ -401,12 +409,45 @@ class GET_CHART:
                             num,
                         ]
                     )
+            self.insert()
         elif self.exchange == "GATEIO":
-            print("GATEIO")
-            print(self.db[0])
+            for db in self.basedata:
+                for num, a in enumerate(db["data"]):
+                    self.targetdb.append(
+                        [
+                            self.exchange,
+                            db["ticker"],
+                            a[0],
+                            a[2],
+                            a[5],
+                            a[3],
+                            a[4],
+                            a[1],
+                            num,
+                        ]
+                    )
+            self.insert()
         elif self.exchange == "HUOBI":
-            print("HUOBI")
-            print(self.db[0])
+            # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
+            for db in self.basedata:
+                try:
+                    for num, a in enumerate(db["data"]["data"]):
+                        self.targetdb.append(
+                            [
+                                self.exchange,
+                                db["ticker"],
+                                a["id"],
+                                a["open"],
+                                a["close"],
+                                a["low"],
+                                a["high"],
+                                a["vol"],
+                                num,
+                            ]
+                        )
+                except:
+                    continue
+            self.insert()
 
     async def main(self):
         print(self.exchange)
@@ -435,17 +476,20 @@ def initiate_ticker():
 
 async def initiate_chart():
     doneexc = [
+
+    ]
+    tempexc = [
+        "BYBIT",
+    ]
+    exchange = [
+        "HUOBI",
         "UPBIT",
         "MEXC",
         "FTX",
         "BINANCE",
-    ]
-    tempexc = [
-        "BYBIT",
+        "KUCOIN",
         "GATEIO",
-        "HUOBI",
     ]
-    exchange = ["KUCOIN",]
     await asyncio.gather(
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
     )

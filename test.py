@@ -1,3 +1,4 @@
 a = {"data": {"dta": "dta"}}
 
-print(type(a["data"]))
+print(str(a))
+print(type(str(a)))
