@@ -137,8 +137,8 @@ class GET_CHART:
                         Flag = True
                     if Flag == True and CurrentTicker != args[1]:
                         cur.execute(
-                            "DELETE FROM %sDATA WHERE ticker = %s",
-                            (self.exchange, args[1]),
+                            f"DELETE FROM {self.exchange}DATA WHERE ticker = %s",
+                            (args[1],),
                         )
                         post.commit()
                         Flag = False
@@ -155,7 +155,7 @@ class GET_CHART:
                         args[8],
                     )
                     cur.execute(
-                        "INSERT INTO CHARTDATA (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        f"INSERT INTO {self.exchange}DATA (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                         (
                             args[0],
                             args[1],
@@ -214,7 +214,10 @@ class GET_CHART:
             ]
         elif self.exchange == "KUCOIN":
             self.basedata = [
-                {"url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*200}&endAt{int(datetime.datetime.now().timestamp())}", "ticker": ticker}
+                {
+                    "url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*200}&endAt{int(datetime.datetime.now().timestamp())}",
+                    "ticker": ticker,
+                }
                 for ticker in self.tickers
             ]
         elif self.exchange == "MEXC":
@@ -296,7 +299,6 @@ class GET_CHART:
                         break
                     await asyncio.sleep(1)
                     await self.RefetchData(lst)
-
 
     def processing_Data(self):
         if self.exchange == "BYBIT":
@@ -473,17 +475,18 @@ async def initiate_chart():
         "BYBIT",
     ]
     exchange = [
+        "KUCOIN",
+        "GATEIO",
         "HUOBI",
         "UPBIT",
         "MEXC",
         "FTX",
         "BINANCE",
-        "KUCOIN",
-        "GATEIO",
     ]
     await asyncio.gather(
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
     )
+
 
 if __name__ == "__main__":
     while True:
@@ -493,12 +496,22 @@ if __name__ == "__main__":
                 a = cur.fetchall()[0][0]
                 cur.execute("SELECT tstamp FROM TSTAMP WHERE exnum = 2")
                 b = cur.fetchall()[0][0]
-                if a == None or a <= (int(datetime.datetime.now().timestamp()) -10800):
+                if a == None or int(a) <= (
+                    int(datetime.datetime.now().timestamp()) - 10800
+                ):
                     initiate_ticker()
-                    cur.execute( "UPDATE TSTAMP SET tstamp = %s WHERE exnum = 1",(int(datetime.datetime.now().timestamp()),))
+                    cur.execute(
+                        "UPDATE TSTAMP SET tstamp = %s WHERE exnum = 1",
+                        (int(datetime.datetime.now().timestamp()),),
+                    )
                     post.commit()
-                if b == None or b <= (int(datetime.datetime.now().timestamp()) - 3600):
+                if b == None or int(b) <= (
+                    int(datetime.datetime.now().timestamp()) - 3600
+                ):
                     asyncio.run(initiate_chart())
-                    cur.execute( "UPDATE TSTAMP SET tstamp = %s WHERE exnum = 2",(int(datetime.datetime.now().timestamp()),))
+                    cur.execute(
+                        "UPDATE TSTAMP SET tstamp = %s WHERE exnum = 2",
+                        (int(datetime.datetime.now().timestamp()),),
+                    )
                     post.commit()
         time.sleep(1000)

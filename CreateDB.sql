@@ -9,20 +9,6 @@ CREATE TABLE IF NOT EXISTS TICKERS (
   tickers text[]
 );
 
-DROP TABLE IF EXISTS CHARTDATA;
-
-CREATE TABLE IF NOT EXISTS CHARTDATA (
-  exchange text NOT NULL,
-  ticker text NOT NULL,
-  tstamp text NOT NULL,
-  open float NOT NULL,
-  close float NOT NULL,
-  low float NOT NULL,
-  high float NOT NULL,
-  vol float NOT NULL,
-  count int NOT NULL
-);
-
 DROP TABLE IF EXISTS TSTAMP;
 
 CREATE TABLE IF NOT EXISTS TSTAMP (
@@ -140,7 +126,3 @@ SELECT
 FROM
   tickers;
 
-SELECT
-  *
-FROM
-  CHARTDATA;
