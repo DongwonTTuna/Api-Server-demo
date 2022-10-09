@@ -27,7 +27,7 @@ DROP TABLE IF EXISTS TSTAMP;
 
 CREATE TABLE IF NOT EXISTS TSTAMP (
   exnum serial PRIMARY KEY NOT NULL,
-  tstamp int
+  tstamp text
 );
 
 

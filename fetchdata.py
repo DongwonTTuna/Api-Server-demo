@@ -1,4 +1,4 @@
-import aiohttp, ssl, psycopg, asyncio, nest_asyncio, datetime, json
+import aiohttp, ssl, psycopg, asyncio, nest_asyncio, datetime, time
 from aioexec import Procs, Call
 
 nest_asyncio.apply()
@@ -179,7 +179,7 @@ class GET_CHART:
         if self.exchange == "BYBIT":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=60&from={round(datetime.datetime.now().timestamp()) - 3600*200}",
+                    "url": f"{self.baseurl}{ticker}&interval=60&from={int(datetime.datetime.now().timestamp()) - 3600*200}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -214,7 +214,7 @@ class GET_CHART:
             ]
         elif self.exchange == "KUCOIN":
             self.basedata = [
-                {"url": f"{self.baseurl}{ticker}", "ticker": ticker}
+                {"url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*200}&endAt{int(datetime.datetime.now().timestamp())}", "ticker": ticker}
                 for ticker in self.tickers
             ]
         elif self.exchange == "MEXC":
@@ -228,7 +228,7 @@ class GET_CHART:
         elif self.exchange == "FTX":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={round(datetime.datetime.now().timestamp()) - 3600*200}",
+                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={int(datetime.datetime.now().timestamp()) - 3600*200}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -237,7 +237,6 @@ class GET_CHART:
     async def RefetchData(self, lst):
         for num in lst:
             self.basedata[num]["data"] = ""
-        print(len(lst))
         res = await asyncio.gather(
             *[fetch_request(self.basedata[num]["url"]) for num in lst]
         )
@@ -298,12 +297,10 @@ class GET_CHART:
                     await asyncio.sleep(1)
                     await self.RefetchData(lst)
 
-        print("succes")
 
     def processing_Data(self):
         if self.exchange == "BYBIT":
             for db in self.basedata:
-                print(db)
                 for n, a in enumerate(db["data"]["result"]):
                     # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
                     self.targetdb.append(
@@ -361,7 +358,7 @@ class GET_CHART:
                         [
                             self.exchange,
                             db["ticker"],
-                            round(
+                            int(
                                 datetime.datetime.fromisoformat(
                                     each["startTime"]
                                 ).timestamp()
@@ -454,9 +451,6 @@ class GET_CHART:
         self.get_tickers()
         self.sumurls()
         await self.fetchDataFromTheUrl()
-        with open("./result.txt", "w") as f:
-            for data in self.basedata:
-                f.write(str(data) + "\n")
         self.processing_Data()
         print(self.exchange)
 
@@ -475,9 +469,6 @@ def initiate_ticker():
 
 
 async def initiate_chart():
-    doneexc = [
-
-    ]
     tempexc = [
         "BYBIT",
     ]
@@ -494,7 +485,20 @@ async def initiate_chart():
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
     )
 
-
 if __name__ == "__main__":
-    initiate_ticker()
-    asyncio.run(initiate_chart())
+    while True:
+        with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
+            with post.cursor() as cur:
+                cur.execute("SELECT tstamp FROM TSTAMP WHERE exnum = 1")
+                a = cur.fetchall()[0][0]
+                cur.execute("SELECT tstamp FROM TSTAMP WHERE exnum = 2")
+                b = cur.fetchall()[0][0]
+                if a == None or a <= (int(datetime.datetime.now().timestamp()) -10800):
+                    initiate_ticker()
+                    cur.execute( "UPDATE TSTAMP SET tstamp = %s WHERE exnum = 1",(int(datetime.datetime.now().timestamp()),))
+                    post.commit()
+                if b == None or b <= (int(datetime.datetime.now().timestamp()) - 3600):
+                    asyncio.run(initiate_chart())
+                    cur.execute( "UPDATE TSTAMP SET tstamp = %s WHERE exnum = 2",(int(datetime.datetime.now().timestamp()),))
+                    post.commit()
+        time.sleep(1000)
