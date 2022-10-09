@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS TSTAMP (
 /* INSERT VALUES*/
 INSERT INTO tickers (exchange, tickers)
   VALUES ('UPBIT', NULL);
+
 INSERT INTO tickers (exchange, tickers)
   VALUES ('BYBIT', NULL);
 
@@ -60,6 +61,21 @@ INSERT INTO TSTAMP (tstamp)
 
 INSERT INTO TSTAMP (tstamp)
   VALUES (NULL);
+
+DO $$
+DECLARE
+  exc text;
+BEGIN
+  FOR exc IN
+  SELECT
+    exchange
+  FROM
+    TICKERS LOOP
+      EXECUTE 'DROP TABLE IF EXISTS ' || exc;
+      EXECUTE 'CREATE TABLE IF NOT EXISTS ' || exc || 'DATA( exchange text NOT NULL,  ticker text NOT NULL,  tstamp text NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL,  count int NOT NULL)';
+    END LOOP;
+END
+$$;
 
 DROP PROCEDURE IF EXISTS updTicker;
 
@@ -94,7 +110,7 @@ CREATE FUNCTION getChart (exc text)
   RETURNS TABLE (
     exchange text,
     ticker text,
-    tstamp int,
+    tstamp text,
     OPEN float,
     CLOSE float,
     low float,
@@ -106,7 +122,13 @@ CREATE FUNCTION getChart (exc text)
   SELECT
     (exchange,
       ticker,
-      chartdata)
+      tstamp,
+      OPEN,
+      CLOSE,
+      low,
+      high,
+      vol,
+      count)
   FROM
     chartdata
   WHERE
@@ -122,4 +144,3 @@ SELECT
   *
 FROM
   CHARTDATA;
-

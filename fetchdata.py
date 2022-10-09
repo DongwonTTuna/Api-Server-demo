@@ -137,7 +137,7 @@ class GET_CHART:
                         Flag = True
                     if Flag == True and CurrentTicker != args[1]:
                         cur.execute(
-                            "DELETE FROM CHARTDATA WHERE (exchange,ticker) = (%s,%s)",
+                            "DELETE FROM %sDATA WHERE ticker = %s",
                             (self.exchange, args[1]),
                         )
                         post.commit()
