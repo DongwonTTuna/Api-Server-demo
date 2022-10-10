@@ -57,8 +57,8 @@ BEGIN
     exchange
   FROM
     TICKERS LOOP
-      EXECUTE 'DROP TABLE IF EXISTS ' || exc;
-      EXECUTE 'CREATE TABLE IF NOT EXISTS ' || exc || 'DATA( exchange text NOT NULL,  ticker text NOT NULL,  tstamp text NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL,  count int NOT NULL)';
+      EXECUTE 'DROP TABLE IF EXISTS ' || exc||'DATA';
+      EXECUTE 'CREATE TABLE IF NOT EXISTS ' || exc || 'DATA(ticker text NOT NULL,  tstamp text NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL,  count int NOT NULL)';
     END LOOP;
 END
 $$;
@@ -90,36 +90,6 @@ CREATE FUNCTION getTicker (exc text)
     exchange = exc;
 $$;
 
-DROP FUNCTION IF EXISTS getChart;
-
-CREATE FUNCTION getChart (exc text)
-  RETURNS TABLE (
-    exchange text,
-    ticker text,
-    tstamp text,
-    OPEN float,
-    CLOSE float,
-    low float,
-    high float,
-    vol float,
-    count int)
-  LANGUAGE SQL
-  AS $$
-  SELECT
-    (exchange,
-      ticker,
-      tstamp,
-      OPEN,
-      CLOSE,
-      low,
-      high,
-      vol,
-      count)
-  FROM
-    chartdata
-  WHERE
-    exchange = exc;
-$$;
 
 SELECT
   *

@@ -133,29 +133,17 @@ class GET_CHART:
                 Flag = True
                 CurrentTicker = ""
                 for args in self.targetdb:
-                    if CurrentTicker != args[1]:
+                    if CurrentTicker != args[0]:
                         Flag = True
-                    if Flag == True and CurrentTicker != args[1]:
+                    if Flag == True and CurrentTicker != args[0]:
                         cur.execute(
-                            f"DELETE FROM {self.exchange}DATA WHERE ticker = %s",
-                            (args[1],),
+                            f"DELETE FROM {self.exchange}DATA WHERE ticker = '{args[0]}'",
                         )
                         post.commit()
                         Flag = False
-                        CurrentTicker = args[1]
-                    print(
-                        args[0],
-                        args[1],
-                        args[2],
-                        args[3],
-                        args[4],
-                        args[5],
-                        args[6],
-                        args[7],
-                        args[8],
-                    )
+                        CurrentTicker = args[0]
                     cur.execute(
-                        f"INSERT INTO {self.exchange}DATA (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        f"INSERT INTO {self.exchange}DATA (ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
                         (
                             args[0],
                             args[1],
@@ -165,7 +153,6 @@ class GET_CHART:
                             args[5],
                             args[6],
                             args[7],
-                            args[8],
                         ),
                     )
 
@@ -307,7 +294,6 @@ class GET_CHART:
                     # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
                     self.targetdb.append(
                         [
-                            self.exchange,
                             a["symbol"],
                             a["open_time"],
                             a["open"],
@@ -324,7 +310,6 @@ class GET_CHART:
                 for num, a in enumerate(db["data"]):
                     self.targetdb.append(
                         [
-                            self.exchange,
                             db["ticker"],
                             a[0],
                             a[4],
@@ -341,7 +326,6 @@ class GET_CHART:
                 for num, a in enumerate(db["data"]):
                     self.targetdb.append(
                         [
-                            self.exchange,
                             a["market"],
                             a["timestamp"],
                             a["opening_price"],
@@ -358,7 +342,6 @@ class GET_CHART:
                 for num, each in enumerate(db["data"]["result"]):
                     self.targetdb.append(
                         [
-                            self.exchange,
                             db["ticker"],
                             int(
                                 datetime.datetime.fromisoformat(
@@ -380,7 +363,6 @@ class GET_CHART:
                     # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
                     self.targetdb.append(
                         [
-                            self.exchange,
                             db["ticker"],
                             a[0],
                             a[1],
@@ -397,7 +379,6 @@ class GET_CHART:
                 for num, a in enumerate(db["data"]["data"]):
                     self.targetdb.append(
                         [
-                            self.exchange,
                             db["ticker"],
                             a[0],
                             a[1],
@@ -414,7 +395,6 @@ class GET_CHART:
                 for num, a in enumerate(db["data"]):
                     self.targetdb.append(
                         [
-                            self.exchange,
                             db["ticker"],
                             a[0],
                             a[2],
@@ -433,7 +413,6 @@ class GET_CHART:
                     for num, a in enumerate(db["data"]["data"]):
                         self.targetdb.append(
                             [
-                                self.exchange,
                                 db["ticker"],
                                 a["id"],
                                 a["open"],
@@ -475,13 +454,13 @@ async def initiate_chart():
         "BYBIT",
     ]
     exchange = [
-        "KUCOIN",
-        "GATEIO",
         "HUOBI",
         "UPBIT",
-        "MEXC",
         "FTX",
         "BINANCE",
+        "MEXC",
+        "KUCOIN",
+        "GATEIO",
     ]
     await asyncio.gather(
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
