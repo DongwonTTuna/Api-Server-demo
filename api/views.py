@@ -9,8 +9,8 @@ from .dbfunc import *
 def chart(request):
     if request.method != 'GET':
         return JsonResponse({})
-    exchange = request.Get.get(key="exchange", default="BINANCE")
-    symbol = request.Get.get(key="symbol", default="BTCUSDT")
+    exchange = request.GET.get(key="exchange", default="BINANCE")
+    symbol = request.GET.get(key="symbol", default="BTCUSDT")
     return JsonResponse(fetch_chartdata(exchange,symbol))
 
 
