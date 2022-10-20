@@ -1,8 +1,8 @@
-import aiohttp, ssl, psycopg, asyncio, nest_asyncio, datetime, time
+import aiohttp, ssl, asyncio, nest_asyncio, datetime, time, io, csv
 from aioexec import Procs, Call
+import psycopg2 as psycopg
 
 nest_asyncio.apply()
-semaphore = asyncio.Semaphore(200)
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
@@ -20,13 +20,12 @@ async def fetch_request(url: str):
     header = set_header(url)
     while True:
         try:
-            async with semaphore:
-                async with aiohttp.ClientSession(headers=header) as session:
-                    async with session.get(url) as res:
-                        try:
-                            return await res.json()
-                        except:
-                            return await res.read()
+            async with aiohttp.ClientSession(headers=header) as session:
+                async with session.get(url) as res:
+                    try:
+                        return await res.json()
+                    except:
+                        return await res.read()
         except:
             continue
 
@@ -118,9 +117,8 @@ class GET_CHART:
             "MEXC": "https://api.mexc.com/api/v3/klines?symbol=",
             "KUCOIN": "https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=",
             "GATEIO": "https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=",
-            "HUOBI": "https://api.huobi.pro/market/history/kline?period=60min&size=200&symbol=",
+            "HUOBI": "https://api.huobi.pro/market/history/kline?period=60min&size=1000&symbol=",
         }
-
         self.exchange = exchange
         self.baseurl = url[exchange]
         self.basedata = []
@@ -130,31 +128,19 @@ class GET_CHART:
     def insert(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
-                Flag = True
-                CurrentTicker = ""
-                for args in self.targetdb:
-                    if CurrentTicker != args[0]:
-                        Flag = True
-                    if Flag == True and CurrentTicker != args[0]:
-                        cur.execute(
-                            f"DELETE FROM {self.exchange}DATA WHERE ticker = '{args[0]}'",
-                        )
-                        post.commit()
-                        Flag = False
-                        CurrentTicker = args[0]
-                    cur.execute(
-                        f"INSERT INTO {self.exchange}DATA (ticker, tstamp, OPEN, CLOSE, low, high, vol, count) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                        (
-                            args[0],
-                            args[1],
-                            args[2],
-                            args[3],
-                            args[4],
-                            args[5],
-                            args[6],
-                            args[7],
-                        ),
-                    )
+                cur.execute(
+                    f"DELETE FROM cdata.{self.exchange.lower()}data",
+                )
+                post.commit()
+                buf = io.StringIO()
+                writer = csv.writer(buf)
+                writer.writerows(self.targetdb)
+                buf.seek(0)
+                cur.copy_expert(
+                    f"COPY cdata.{self.exchange.lower()}data FROM stdin DELIMITER ',' CSV",
+                    file=buf,
+                )
+                post.commit()
 
     def get_tickers(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
@@ -166,7 +152,7 @@ class GET_CHART:
         if self.exchange == "BYBIT":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=60&from={int(datetime.datetime.now().timestamp()) - 3600*200}",
+                    "url": f"{self.baseurl}{ticker}&interval=60&from={int(datetime.datetime.now().timestamp()) - 3600*1000}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -181,7 +167,7 @@ class GET_CHART:
         elif self.exchange == "BINANCE":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=1h&limit=200",
+                    "url": f"{self.baseurl}{ticker}&interval=1h&limit=1000",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -194,7 +180,7 @@ class GET_CHART:
         elif self.exchange == "GATEIO":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&limit=200&interval=1h",
+                    "url": f"{self.baseurl}{ticker}&limit=1000&interval=1h",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -202,7 +188,7 @@ class GET_CHART:
         elif self.exchange == "KUCOIN":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*200}&endAt{int(datetime.datetime.now().timestamp())}",
+                    "url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*1000}&endAt{int(datetime.datetime.now().timestamp())}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -210,7 +196,7 @@ class GET_CHART:
         elif self.exchange == "MEXC":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=60m&limit=200",
+                    "url": f"{self.baseurl}{ticker}&interval=60m&limit=1000",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -218,7 +204,7 @@ class GET_CHART:
         elif self.exchange == "FTX":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={int(datetime.datetime.now().timestamp()) - 3600*200}",
+                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={int(datetime.datetime.now().timestamp()) - 3600*1000}&end_time={int(datetime.datetime.now().timestamp())}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -290,137 +276,163 @@ class GET_CHART:
     def processing_Data(self):
         if self.exchange == "BYBIT":
             for db in self.basedata:
-                for n, a in enumerate(db["data"]["result"]):
-                    # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
+                for a in db["data"]["result"]:
                     self.targetdb.append(
                         [
-                            a["symbol"],
+                            a["symbol"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
                             a["open_time"],
                             a["open"],
                             a["close"],
                             a["low"],
                             a["high"],
                             a["volume"],
-                            n,
                         ]
                     )
             self.insert()
         elif self.exchange == "BINANCE":
             for db in self.basedata:
-                for num, a in enumerate(db["data"]):
+                for a in db["data"]:
                     self.targetdb.append(
                         [
-                            db["ticker"],
-                            a[0],
+                            db["ticker"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
+                            int("".join([*str(a[0])][0:10])),
                             a[4],
                             a[3],
                             a[2],
                             a[4],
                             a[5],
-                            num,
                         ]
                     )
             self.insert()
         elif self.exchange == "UPBIT":
             for db in self.basedata:
-                for num, a in enumerate(db["data"]):
+                for a in db["data"]:
                     self.targetdb.append(
                         [
-                            a["market"],
-                            a["timestamp"],
+                            a["market"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
+                            int("".join([*str(a["timestamp"])][0:10])),
                             a["opening_price"],
                             a["trade_price"],
                             a["low_price"],
                             a["high_price"],
                             a["candle_acc_trade_volume"],
-                            num,
                         ]
                     )
             self.insert()
         elif self.exchange == "FTX":
             for db in self.basedata:
-                for num, each in enumerate(db["data"]["result"]):
+                print(db)
+                for each in db["data"]["result"]:
                     self.targetdb.append(
                         [
-                            db["ticker"],
-                            int(
-                                datetime.datetime.fromisoformat(
-                                    each["startTime"]
-                                ).timestamp()
+                            db["ticker"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
+                            "".join(
+                                [
+                                    *str(
+                                        datetime.datetime.fromisoformat(
+                                            each["startTime"]
+                                        ).timestamp()
+                                    )
+                                ][0:10]
                             ),
-                            each["open"],
-                            each["close"],
-                            each["low"],
-                            each["high"],
-                            each["volume"],
-                            num,
+                            float(each["open"]),
+                            float(each["close"]),
+                            float(each["low"]),
+                            float(each["high"]),
+                            float(each["volume"]),
                         ]
                     )
             self.insert()
         elif self.exchange == "MEXC":
             for db in self.basedata:
-                for num, a in enumerate(db["data"]):
-                    # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
+                for a in db["data"]:
                     self.targetdb.append(
                         [
-                            db["ticker"],
-                            a[0],
-                            a[1],
-                            a[4],
-                            a[3],
-                            a[2],
-                            a[5],
-                            num,
+                            db["ticker"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
+                            "".join([*str(a[0])][0:10]),
+                            float(a[1]),
+                            float(a[4]),
+                            float(a[3]),
+                            float(a[2]),
+                            float(a[5]),
                         ]
                     )
             self.insert()
         elif self.exchange == "KUCOIN":
             for db in self.basedata:
-                for num, a in enumerate(db["data"]["data"]):
+                for a in db["data"]["data"]:
                     self.targetdb.append(
                         [
-                            db["ticker"],
-                            a[0],
-                            a[1],
-                            a[2],
-                            a[4],
-                            a[3],
-                            a[5],
-                            num,
+                            db["ticker"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
+                            "".join([*str(a[0])][0:10]),
+                            float(a[1]),
+                            float(a[2]),
+                            float(a[4]),
+                            float(a[3]),
+                            float(a[5]),
                         ]
                     )
             self.insert()
         elif self.exchange == "GATEIO":
             for db in self.basedata:
-                for num, a in enumerate(db["data"]):
+                for a in db["data"]:
                     self.targetdb.append(
                         [
-                            db["ticker"],
-                            a[0],
-                            a[2],
-                            a[5],
-                            a[3],
-                            a[4],
-                            a[1],
-                            num,
+                            db["ticker"]
+                            .upper()
+                            .replace("-", "")
+                            .replace("_", "")
+                            .replace("/", ""),
+                            "".join([*str(a[0])][0:10]),
+                            float(a[2]),
+                            float(a[5]),
+                            float(a[3]),
+                            float(a[4]),
+                            float(a[1]),
                         ]
                     )
             self.insert()
         elif self.exchange == "HUOBI":
-            # (exchange, ticker, tstamp, OPEN, CLOSE, low, high, vol, count)]
             for db in self.basedata:
                 try:
-                    for num, a in enumerate(db["data"]["data"]):
+                    for a in db["data"]["data"]:
                         self.targetdb.append(
                             [
-                                db["ticker"],
-                                a["id"],
-                                a["open"],
-                                a["close"],
-                                a["low"],
-                                a["high"],
-                                a["vol"],
-                                num,
+                                db["ticker"]
+                                .upper()
+                                .replace("-", "")
+                                .replace("_", "")
+                                .replace("/", ""),
+                                "".join([*str(a["id"])][0:10]),
+                                float(a["open"]),
+                                float(a["close"]),
+                                float(a["low"]),
+                                float(a["high"]),
+                                float(a["vol"]),
                             ]
                         )
                 except:
@@ -454,13 +466,13 @@ async def initiate_chart():
         "BYBIT",
     ]
     exchange = [
-        "HUOBI",
-        "UPBIT",
-        "FTX",
         "BINANCE",
         "MEXC",
+        "UPBIT",
         "KUCOIN",
+        "HUOBI",
         "GATEIO",
+        "FTX",
     ]
     await asyncio.gather(
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
@@ -493,4 +505,5 @@ if __name__ == "__main__":
                         (int(datetime.datetime.now().timestamp()),),
                     )
                     post.commit()
+        print("done")
         time.sleep(1000)

@@ -48,6 +48,10 @@ INSERT INTO TSTAMP (tstamp)
 INSERT INTO TSTAMP (tstamp)
   VALUES (NULL);
 
+DROP SCHEMA IF EXISTS CDATA CASCADE;
+
+CREATE SCHEMA CDATA;
+
 DO $$
 DECLARE
   exc text;
@@ -57,8 +61,7 @@ BEGIN
     exchange
   FROM
     TICKERS LOOP
-      EXECUTE 'DROP TABLE IF EXISTS ' || exc||'DATA';
-      EXECUTE 'CREATE TABLE IF NOT EXISTS ' || exc || 'DATA(ticker text NOT NULL,  tstamp text NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL,  count int NOT NULL)';
+      EXECUTE 'CREATE TABLE IF NOT EXISTS CDATA.' || exc || 'DATA(ticker text NOT NULL,  tstamp text NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL)';
     END LOOP;
 END
 $$;
@@ -89,10 +92,4 @@ CREATE FUNCTION getTicker (exc text)
   WHERE
     exchange = exc;
 $$;
-
-
-SELECT
-  *
-FROM
-  tickers;
 

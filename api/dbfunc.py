@@ -14,7 +14,7 @@ def fetch_exchanges():
      with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 cur.execute("SELECT exchange FROM TICKERS")
-                return {"status":200, "data":{"excs":[db[0] for db in cur.fetchall()]}}
+                return {"status":200, "data":{"excs":[db[0].upper().replace('-','').replace('_','').replace('/','') for db in cur.fetchall()]}}
 
 def fetch_chartdata(exchange, symbol):
          with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
