@@ -117,7 +117,7 @@ class GET_CHART:
             "MEXC": "https://api.mexc.com/api/v3/klines?symbol=",
             "KUCOIN": "https://api.kucoin.com/api/v1/market/candles?type=1hour&symbol=",
             "GATEIO": "https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=",
-            "HUOBI": "https://api.huobi.pro/market/history/kline?period=60min&size=1000&symbol=",
+            "HUOBI": "https://api.huobi.pro/market/history/kline?period=60min&size=500&symbol=",
         }
         self.exchange = exchange
         self.baseurl = url[exchange]
@@ -152,7 +152,7 @@ class GET_CHART:
         if self.exchange == "BYBIT":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=60&from={int(datetime.datetime.now().timestamp()) - 3600*1000}",
+                    "url": f"{self.baseurl}{ticker}&interval=60&from={int(datetime.datetime.now().timestamp()) - 3600*500}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -167,7 +167,7 @@ class GET_CHART:
         elif self.exchange == "BINANCE":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=1h&limit=1000",
+                    "url": f"{self.baseurl}{ticker}&interval=1h&limit=500",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -180,7 +180,7 @@ class GET_CHART:
         elif self.exchange == "GATEIO":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&limit=1000&interval=1h",
+                    "url": f"{self.baseurl}{ticker}&limit=500&interval=1h",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -188,7 +188,7 @@ class GET_CHART:
         elif self.exchange == "KUCOIN":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*1000}&endAt{int(datetime.datetime.now().timestamp())}",
+                    "url": f"{self.baseurl}{ticker}&startAt={int(datetime.datetime.now().timestamp()) - 3600*500}&endAt{int(datetime.datetime.now().timestamp())}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -196,7 +196,7 @@ class GET_CHART:
         elif self.exchange == "MEXC":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}&interval=60m&limit=1000",
+                    "url": f"{self.baseurl}{ticker}&interval=60m&limit=500",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -204,7 +204,7 @@ class GET_CHART:
         elif self.exchange == "FTX":
             self.basedata = [
                 {
-                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={int(datetime.datetime.now().timestamp()) - 3600*1000}&end_time={int(datetime.datetime.now().timestamp())}",
+                    "url": f"{self.baseurl}{ticker}/candles?resolution=3600&start_time={int(datetime.datetime.now().timestamp()) - 3600*500}&end_time={int(datetime.datetime.now().timestamp())}",
                     "ticker": ticker,
                 }
                 for ticker in self.tickers
@@ -333,7 +333,6 @@ class GET_CHART:
             self.insert()
         elif self.exchange == "FTX":
             for db in self.basedata:
-                print(db)
                 for each in db["data"]["result"]:
                     self.targetdb.append(
                         [
@@ -441,10 +440,15 @@ class GET_CHART:
 
     async def main(self):
         print(self.exchange)
-        self.get_tickers()
-        self.sumurls()
-        await self.fetchDataFromTheUrl()
-        self.processing_Data()
+        while True:
+            try:
+                self.get_tickers()
+                self.sumurls()
+                await self.fetchDataFromTheUrl()
+                self.processing_Data()
+                break
+            except:
+                continue
         print(self.exchange)
 
 
@@ -481,6 +485,7 @@ async def initiate_chart():
 
 if __name__ == "__main__":
     while True:
+        start = time.time()
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
                 cur.execute("SELECT tstamp FROM TSTAMP WHERE exnum = 1")
@@ -505,5 +510,5 @@ if __name__ == "__main__":
                         (int(datetime.datetime.now().timestamp()),),
                     )
                     post.commit()
-        print("done")
+        print("Done!" + "\n\nTotal runtime: ", time.time() - start)
         time.sleep(1000)
