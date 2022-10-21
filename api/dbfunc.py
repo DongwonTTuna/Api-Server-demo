@@ -19,11 +19,9 @@ def fetch_exchanges():
 def fetch_chartdata(exchange, symbol):
          with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
             with post.cursor() as cur:
-                cur.execute(f"SELECT * FROM {exchange}DATA WHERE ticker='{symbol}'")
+                cur.execute(f"SELECT * FROM cdata.{exchange.lower()}data WHERE ticker='{symbol}'")
                 data = cur.fetchall()
                 if len(data) == 0:
                     return {"status": 404, "data":"Ticker or Exchange does not Found"}
-                return {"status":200, "data":{"chartdata":[[dta[1],dta[2],dta[3],dta[4],dta[5],dta[6],dta[7]] for dta in data ]}}
+                return {"status":200, "data":[[dta[1],dta[2],dta[3],dta[4],dta[5],dta[6]] for dta in data ]}
                 
-if __name__ == "__main__":
-    fetch_chartdata('BINANCE', 'BTCUSDT')
