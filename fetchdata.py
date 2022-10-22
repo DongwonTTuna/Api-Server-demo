@@ -53,12 +53,18 @@ class GET_TICKERS:
             market_list = list(filter(lambda x: x.find("KRW") != -1, market_list))
         elif target == "BINANCE":
             market_list = [a["symbol"] for a in res["symbols"]]
-            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
+            market_list = list(
+                filter(
+                    lambda x: x.find("USDT") != -1 and x.find("USD") > 1, market_list
+                )
+            )
         elif target == "FTX":
             market_list = [a["name"] for a in res["result"]]
             market_list = list(
                 filter(
-                    lambda x: x.find("USDT") != -1 or x.find("USD") != -1, market_list
+                    lambda x: (x.find("USDT") != -1 or x.find("USD") != -1)
+                    and x.find("USD") > 1,
+                    market_list,
                 )
             )
         elif target == "MEXC":
@@ -75,19 +81,32 @@ class GET_TICKERS:
                         and x.find("4L") == -1
                         and x.find("5S") == -1
                         and x.find("5L") == -1
+                        and x.find("USD") > 1
                     ),
                     market_list,
                 )
             )
         elif target == "KUCOIN":
             market_list = [a["symbol"] for a in res["data"]]
-            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
+            market_list = list(
+                filter(
+                    lambda x: x.find("USDT") != -1 and x.find("USD") > 1, market_list
+                )
+            )
         elif target == "GATEIO":
             market_list = [a["id"] for a in res]
-            market_list = list(filter(lambda x: x.find("USDT") != -1, market_list))
+            market_list = list(
+                filter(
+                    lambda x: x.find("USDT") != -1 and x.find("USD") > 1, market_list
+                )
+            )
         elif target == "HUOBI":
             market_list = [a["bc"] + a["qc"] for a in res["data"]]
-            market_list = list(filter(lambda x: x.find("usdt") != -1, market_list))
+            market_list = list(
+                filter(
+                    lambda x: x.find("usdt") != -1 and x.find("usd") > 1, market_list
+                )
+            )
         else:
             return
 
@@ -297,7 +316,7 @@ class GET_CHART:
             for db in self.basedata:
                 for a in db["data"]:
                     self.targetdb.append(
-                        #oclh
+                        # oclh
                         [
                             db["ticker"]
                             .upper()
@@ -309,7 +328,7 @@ class GET_CHART:
                             float(a[4]),
                             float(a[3]),
                             float(a[2]),
-                            float(a[5])*float(a[4]),
+                            float(a[5]) * float(a[4]),
                         ]
                     )
             self.insert()
@@ -374,7 +393,7 @@ class GET_CHART:
                             float(a[4]),
                             float(a[3]),
                             float(a[2]),
-                            float(a[5])*float(a[4]),
+                            float(a[5]) * float(a[4]),
                         ]
                     )
             self.insert()
@@ -393,7 +412,7 @@ class GET_CHART:
                             float(a[2]),
                             float(a[4]),
                             float(a[3]),
-                            float(a[5])*float(a[2]),
+                            float(a[5]) * float(a[2]),
                         ]
                     )
             self.insert()
@@ -472,15 +491,16 @@ def initiate_ticker():
 async def initiate_chart():
     tempexc = [
         "BYBIT",
-    ]
-    exchange = [
-        "BINANCE",
         "MEXC",
         "UPBIT",
         "KUCOIN",
         "HUOBI",
-        "GATEIO",
+        
+        "BINANCE",
         "FTX",
+    ]
+    exchange = [
+        "GATEIO",
     ]
     await asyncio.gather(
         *Procs(10).batch(Call(startchart, exchange=exc) for exc in exchange)
