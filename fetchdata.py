@@ -450,6 +450,9 @@ class GET_CHART:
                 self.processing_Data()
                 break
             except:
+                self.basedata = []
+                self.tickers = []
+                self.targetdb = []
                 continue
         print(self.exchange)
 
