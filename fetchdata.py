@@ -441,10 +441,10 @@ class GET_CHART:
 
     async def main(self):
         print(self.exchange)
-        self.get_tickers()
-        self.sumurls()
         while True:
             try:
+                self.get_tickers()
+                self.sumurls()
                 await self.fetchDataFromTheUrl()
                 self.processing_Data()
                 break
@@ -506,7 +506,7 @@ if __name__ == "__main__":
                     )
                     post.commit()
                 if b == None or int(b) <= (
-                    int(datetime.datetime.now().timestamp()) - 1200
+                    int(datetime.datetime.now().timestamp()) - 120
                 ):
                     asyncio.run(initiate_chart())
                     cur.execute(
