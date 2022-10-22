@@ -309,7 +309,7 @@ class GET_CHART:
                             float(a[4]),
                             float(a[3]),
                             float(a[2]),
-                            float(a[5]),
+                            float(a[5])*float(a[4]),
                         ]
                     )
             self.insert()
@@ -328,7 +328,7 @@ class GET_CHART:
                             a["trade_price"],
                             a["low_price"],
                             a["high_price"],
-                            a["candle_acc_trade_volume"],
+                            a["candle_acc_trade_price"],
                         ]
                     )
             self.insert()
@@ -374,7 +374,7 @@ class GET_CHART:
                             float(a[4]),
                             float(a[3]),
                             float(a[2]),
-                            float(a[5]),
+                            float(a[5])*float(a[4]),
                         ]
                     )
             self.insert()
@@ -393,7 +393,7 @@ class GET_CHART:
                             float(a[2]),
                             float(a[4]),
                             float(a[3]),
-                            float(a[5]),
+                            float(a[5])*float(a[2]),
                         ]
                     )
             self.insert()
