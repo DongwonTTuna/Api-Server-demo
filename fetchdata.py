@@ -441,10 +441,10 @@ class GET_CHART:
 
     async def main(self):
         print(self.exchange)
+        self.get_tickers()
+        self.sumurls()
         while True:
             try:
-                self.get_tickers()
-                self.sumurls()
                 await self.fetchDataFromTheUrl()
                 self.processing_Data()
                 break
