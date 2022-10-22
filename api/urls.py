@@ -7,5 +7,6 @@ app_name = 'diary'
 urlpatterns = [
     path('ticker', views.ticker),
     path('exchanges',views.exchanges),
-    path('chart',views.chart)
+    path('chart',views.chart),
+    path('highestvol',views.getHighestVol)
 ]

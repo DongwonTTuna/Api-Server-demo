@@ -25,3 +25,9 @@ def ticker(request):
         return JsonResponse({})
     exchange = request.GET.get(key="exchange", default="BINANCE")
     return JsonResponse(fetch_tickers(exchange))
+
+def getHighestVol(request):
+    if request.method != 'GET':
+        return JsonResponse({})
+    exchange = request.GET.get(key="exchange", default="BINANCE")
+    return JsonResponse(fetch_highest_volume(exchange))
