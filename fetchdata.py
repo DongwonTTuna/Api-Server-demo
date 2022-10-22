@@ -141,6 +141,7 @@ class GET_CHART:
                     file=buf,
                 )
                 post.commit()
+                buf.close()
 
     def get_tickers(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
@@ -503,7 +504,7 @@ if __name__ == "__main__":
                     )
                     post.commit()
                 if b == None or int(b) <= (
-                    int(datetime.datetime.now().timestamp()) - 3600
+                    int(datetime.datetime.now().timestamp()) - 1200
                 ):
                     asyncio.run(initiate_chart())
                     cur.execute(
@@ -512,4 +513,4 @@ if __name__ == "__main__":
                     )
                     post.commit()
         print("Done!" + "\n\nTotal runtime: ", time.time() - start)
-        time.sleep(1000)
+        time.sleep(5)
