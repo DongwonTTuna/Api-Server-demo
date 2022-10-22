@@ -61,7 +61,7 @@ BEGIN
     exchange
   FROM
     TICKERS LOOP
-      EXECUTE 'CREATE TABLE IF NOT EXISTS CDATA.' || exc || 'DATA(ticker text NOT NULL,  tstamp text NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL)';
+      EXECUTE 'CREATE TABLE IF NOT EXISTS CDATA.' || exc || 'DATA(ticker text NOT NULL,  tstamp bigint NOT NULL,  open float NOT NULL,  close float NOT NULL,  low float NOT NULL,  high float NOT NULL,  vol float NOT NULL)';
     END LOOP;
 END
 $$;
