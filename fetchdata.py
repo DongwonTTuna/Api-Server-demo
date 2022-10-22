@@ -408,10 +408,10 @@ class GET_CHART:
                             .replace("_", "")
                             .replace("/", ""),
                             "".join([*str(a[0])][0:10]),
-                            float(a[2]),
+                            float(a[0]),
                             float(a[5]),
+                            float(a[2]),
                             float(a[3]),
-                            float(a[4]),
                             float(a[1]),
                         ]
                     )
