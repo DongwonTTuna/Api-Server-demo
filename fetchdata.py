@@ -297,6 +297,7 @@ class GET_CHART:
             for db in self.basedata:
                 for a in db["data"]:
                     self.targetdb.append(
+                        #oclh
                         [
                             db["ticker"]
                             .upper()
@@ -304,11 +305,11 @@ class GET_CHART:
                             .replace("_", "")
                             .replace("/", ""),
                             int("".join([*str(a[0])][0:10])),
-                            a[4],
-                            a[3],
-                            a[2],
-                            a[4],
-                            a[5],
+                            float(a[1]),
+                            float(a[4]),
+                            float(a[3]),
+                            float(a[2]),
+                            float(a[5]),
                         ]
                     )
             self.insert()

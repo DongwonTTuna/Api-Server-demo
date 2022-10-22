@@ -35,9 +35,11 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "api",
+    'corsheaders'
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -46,6 +48,13 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# 許可するオリジン
+CORS_ORIGIN_WHITELIST = [
+    '*',
+]
+# レスポンスを公開する
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = "apiserver.urls"
 
