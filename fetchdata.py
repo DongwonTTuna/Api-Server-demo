@@ -141,7 +141,6 @@ class GET_CHART:
                     file=buf,
                 )
                 post.commit()
-                buf.close()
 
     def get_tickers(self):
         with psycopg.connect("dbname=API_SERVER user=postgres password=0790") as post:
