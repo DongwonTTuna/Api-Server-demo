@@ -526,7 +526,7 @@ if __name__ == "__main__":
                     )
                     post.commit()
                 if b == None or int(b) <= (
-                    int(datetime.datetime.now().timestamp()) - 120
+                    int(datetime.datetime.now().timestamp()) - 600
                 ):
                     asyncio.run(initiate_chart())
                     cur.execute(
