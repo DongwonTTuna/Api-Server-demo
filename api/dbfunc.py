@@ -43,7 +43,7 @@ def fetch_highest_volume(exchange):
                 if len(data) == 0:
                         return {"status": 404, "data":"Exchange does not Found"}
                 data = [p[0] for p in data]
-                return {"status":200, "data":data[:30]}
+                return {"status":200, "data":data[:10]}
             except:
                 return {"status": 400, "data": "Error Occured"}
     
